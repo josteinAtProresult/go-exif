@@ -1120,17 +1120,21 @@ func (ib *IfdBuilder) AddTagsFromExisting(ifd *Ifd, includeTagIds []uint16, excl
 			rawBytes, err := ite.GetRawBytes()
 			log.PanicIf(err)
 
-			value := NewIfdBuilderTagValueFromBytes(rawBytes)
+			if rawBytes != nil {
+				value := NewIfdBuilderTagValueFromBytes(rawBytes)
 
-			bt = NewBuilderTag(
-				ifd.IfdPath,
-				ite.TagId(),
-				ite.TagType(),
-				value,
-				ib.byteOrder)
+				bt = NewBuilderTag(
+					ifd.IfdPath,
+					ite.TagId(),
+					ite.TagType(),
+					value,
+					ib.byteOrder)
+			}
 		}
 
-		err := ib.add(bt)
+		if bt != nil {
+			err = ib.add(bt)
+		}
 		log.PanicIf(err)
 	}
 

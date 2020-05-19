@@ -131,6 +131,9 @@ func (ite *IfdTagEntry) GetRawBytes() (rawBytes []byte, err error) {
 				log.Panic(err)
 			}
 		}
+		if value == nil {
+			return nil, nil
+		}
 
 		// Encode it back, in order to get the raw bytes. This is the best,
 		// general way to do it with an undefined tag.
