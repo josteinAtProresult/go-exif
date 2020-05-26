@@ -63,6 +63,7 @@ func TestVisit(t *testing.T) {
 
 	tags := make([]string, 0)
 
+	// DEPRECATED(dustin): fqIfdPath and ifdIndex are now redundant. Remove in next module version.
 	visitor := func(fqIfdPath string, ifdIndex int, ite *IfdTagEntry) (err error) {
 		defer func() {
 			if state := recover(); state != nil {
@@ -73,14 +74,12 @@ func TestVisit(t *testing.T) {
 
 		tagId := ite.TagId()
 		tagType := ite.TagType()
+		ii := ite.ifdIdentity
 
-		ifdPath, err := im.StripPathPhraseIndices(fqIfdPath)
-		log.PanicIf(err)
-
-		it, err := ti.Get(ifdPath, tagId)
+		it, err := ti.Get(ii, tagId)
 		if err != nil {
 			if log.Is(err, ErrTagNotFound) {
-				fmt.Printf("Unknown tag: [%s] (%04x)\n", ifdPath, tagId)
+				fmt.Printf("Unknown tag: [%s] (%04x)\n", ii.String(), tagId)
 				return nil
 			} else {
 				log.Panic(err)
@@ -90,13 +89,13 @@ func TestVisit(t *testing.T) {
 		valueString, err := ite.FormatFirst()
 		log.PanicIf(err)
 
-		description := fmt.Sprintf("IFD-PATH=[%s] ID=(0x%04x) NAME=[%s] COUNT=(%d) TYPE=[%s] VALUE=[%s]", ifdPath, tagId, it.Name, ite.UnitCount(), tagType.String(), valueString)
+		description := fmt.Sprintf("IFD-PATH=[%s] ID=(0x%04x) NAME=[%s] COUNT=(%d) TYPE=[%s] VALUE=[%s]", ii.String(), tagId, it.Name, ite.UnitCount(), tagType.String(), valueString)
 		tags = append(tags, description)
 
 		return nil
 	}
 
-	_, furthestOffset, err := Visit(exifcommon.IfdStandard, im, ti, data[foundAt:], visitor)
+	_, furthestOffset, err := Visit(exifcommon.IfdStandardIfdIdentity, im, ti, data[foundAt:], visitor)
 	log.PanicIf(err)
 
 	if furthestOffset != 32935 {
@@ -157,12 +156,12 @@ func TestVisit(t *testing.T) {
 		"IFD-PATH=[IFD/Exif] ID=(0xa435) NAME=[LensSerialNumber] COUNT=(11) TYPE=[ASCII] VALUE=[2400001068]",
 		"IFD-PATH=[IFD] ID=(0x8825) NAME=[GPSTag] COUNT=(1) TYPE=[LONG] VALUE=[9554]",
 		"IFD-PATH=[IFD/GPSInfo] ID=(0x0000) NAME=[GPSVersionID] COUNT=(4) TYPE=[BYTE] VALUE=[02 03 00 00]",
-		"IFD-PATH=[IFD] ID=(0x0103) NAME=[Compression] COUNT=(1) TYPE=[SHORT] VALUE=[6]",
-		"IFD-PATH=[IFD] ID=(0x011a) NAME=[XResolution] COUNT=(1) TYPE=[RATIONAL] VALUE=[72/1]",
-		"IFD-PATH=[IFD] ID=(0x011b) NAME=[YResolution] COUNT=(1) TYPE=[RATIONAL] VALUE=[72/1]",
-		"IFD-PATH=[IFD] ID=(0x0128) NAME=[ResolutionUnit] COUNT=(1) TYPE=[SHORT] VALUE=[2]",
-		"IFD-PATH=[IFD] ID=(0x0201) NAME=[JPEGInterchangeFormat] COUNT=(1) TYPE=[LONG] VALUE=[11444]",
-		"IFD-PATH=[IFD] ID=(0x0202) NAME=[JPEGInterchangeFormatLength] COUNT=(1) TYPE=[LONG] VALUE=[21491]",
+		"IFD-PATH=[IFD1] ID=(0x0103) NAME=[Compression] COUNT=(1) TYPE=[SHORT] VALUE=[6]",
+		"IFD-PATH=[IFD1] ID=(0x011a) NAME=[XResolution] COUNT=(1) TYPE=[RATIONAL] VALUE=[72/1]",
+		"IFD-PATH=[IFD1] ID=(0x011b) NAME=[YResolution] COUNT=(1) TYPE=[RATIONAL] VALUE=[72/1]",
+		"IFD-PATH=[IFD1] ID=(0x0128) NAME=[ResolutionUnit] COUNT=(1) TYPE=[SHORT] VALUE=[2]",
+		"IFD-PATH=[IFD1] ID=(0x0201) NAME=[JPEGInterchangeFormat] COUNT=(1) TYPE=[LONG] VALUE=[11444]",
+		"IFD-PATH=[IFD1] ID=(0x0202) NAME=[JPEGInterchangeFormatLength] COUNT=(1) TYPE=[LONG] VALUE=[21491]",
 	}
 
 	if reflect.DeepEqual(tags, expected) == false {
@@ -310,52 +309,52 @@ func TestCollect(t *testing.T) {
 		t.Fatalf("Root IFD chain not terminated correctly (2).")
 	}
 
-	if rootIfd.IfdPath != exifcommon.IfdPathStandard {
-		t.Fatalf("Root IFD is not labeled correctly: [%s]", rootIfd.IfdPath)
-	} else if rootIfd.NextIfd.IfdPath != exifcommon.IfdPathStandard {
-		t.Fatalf("Root IFD sibling is not labeled correctly: [%s]", rootIfd.IfdPath)
-	} else if rootIfd.Children[0].IfdPath != exifcommon.IfdPathStandardExif {
-		t.Fatalf("Root IFD child (0) is not labeled correctly: [%s]", rootIfd.Children[0].IfdPath)
-	} else if rootIfd.Children[1].IfdPath != exifcommon.IfdPathStandardGps {
-		t.Fatalf("Root IFD child (1) is not labeled correctly: [%s]", rootIfd.Children[1].IfdPath)
-	} else if rootIfd.Children[0].Children[0].IfdPath != exifcommon.IfdPathStandardExifIop {
-		t.Fatalf("Exif IFD child is not an IOP IFD: [%s]", rootIfd.Children[0].Children[0].IfdPath)
+	if rootIfd.ifdIdentity.UnindexedString() != exifcommon.IfdStandardIfdIdentity.UnindexedString() {
+		t.Fatalf("Root IFD is not labeled correctly: [%s]", rootIfd.ifdIdentity.UnindexedString())
+	} else if rootIfd.NextIfd.ifdIdentity.UnindexedString() != exifcommon.IfdStandardIfdIdentity.UnindexedString() {
+		t.Fatalf("Root IFD sibling is not labeled correctly: [%s]", rootIfd.ifdIdentity.UnindexedString())
+	} else if rootIfd.Children[0].ifdIdentity.UnindexedString() != exifcommon.IfdExifStandardIfdIdentity.UnindexedString() {
+		t.Fatalf("Root IFD child (0) is not labeled correctly: [%s]", rootIfd.Children[0].ifdIdentity.UnindexedString())
+	} else if rootIfd.Children[1].ifdIdentity.UnindexedString() != exifcommon.IfdGpsInfoStandardIfdIdentity.UnindexedString() {
+		t.Fatalf("Root IFD child (1) is not labeled correctly: [%s]", rootIfd.Children[1].ifdIdentity.UnindexedString())
+	} else if rootIfd.Children[0].Children[0].ifdIdentity.UnindexedString() != exifcommon.IfdExifIopStandardIfdIdentity.UnindexedString() {
+		t.Fatalf("Exif IFD child is not an IOP IFD: [%s]", rootIfd.Children[0].Children[0].ifdIdentity.UnindexedString())
 	}
 
-	if lookup[exifcommon.IfdPathStandard].IfdPath != exifcommon.IfdPathStandard {
+	if lookup[exifcommon.IfdStandardIfdIdentity.UnindexedString()].ifdIdentity.UnindexedString() != exifcommon.IfdStandardIfdIdentity.UnindexedString() {
 		t.Fatalf("Lookup for standard IFD not correct.")
-	} else if lookup[exifcommon.IfdPathStandard+"1"].IfdPath != exifcommon.IfdPathStandard {
+	} else if lookup[exifcommon.IfdStandardIfdIdentity.UnindexedString()+"1"].ifdIdentity.UnindexedString() != exifcommon.IfdStandardIfdIdentity.UnindexedString() {
 		t.Fatalf("Lookup for standard IFD not correct.")
 	}
 
-	if lookup[exifcommon.IfdPathStandardExif].IfdPath != exifcommon.IfdPathStandardExif {
+	if lookup[exifcommon.IfdExifStandardIfdIdentity.UnindexedString()].ifdIdentity.UnindexedString() != exifcommon.IfdExifStandardIfdIdentity.UnindexedString() {
 		t.Fatalf("Lookup for EXIF IFD not correct.")
 	}
 
-	if lookup[exifcommon.IfdPathStandardGps].IfdPath != exifcommon.IfdPathStandardGps {
+	if lookup[exifcommon.IfdGpsInfoStandardIfdIdentity.UnindexedString()].ifdIdentity.UnindexedString() != exifcommon.IfdGpsInfoStandardIfdIdentity.UnindexedString() {
 		t.Fatalf("Lookup for GPS IFD not correct.")
 	}
 
-	if lookup[exifcommon.IfdPathStandardExifIop].IfdPath != exifcommon.IfdPathStandardExifIop {
+	if lookup[exifcommon.IfdExifIopStandardIfdIdentity.UnindexedString()].ifdIdentity.UnindexedString() != exifcommon.IfdExifIopStandardIfdIdentity.UnindexedString() {
 		t.Fatalf("Lookup for IOP IFD not correct.")
 	}
 
 	foundExif := 0
 	foundGps := 0
-	for _, ite := range lookup[exifcommon.IfdPathStandard].Entries {
-		if ite.ChildIfdPath() == exifcommon.IfdPathStandardExif {
+	for _, ite := range lookup[exifcommon.IfdStandardIfdIdentity.UnindexedString()].Entries {
+		if ite.ChildIfdPath() == exifcommon.IfdExifStandardIfdIdentity.UnindexedString() {
 			foundExif++
 
-			if ite.TagId() != exifcommon.IfdExifId {
-				t.Fatalf("EXIF IFD tag-ID mismatch: (0x%04x) != (0x%04x)", ite.TagId(), exifcommon.IfdExifId)
+			if ite.TagId() != exifcommon.IfdExifStandardIfdIdentity.TagId() {
+				t.Fatalf("EXIF IFD tag-ID mismatch: (0x%04x) != (0x%04x)", ite.TagId(), exifcommon.IfdExifStandardIfdIdentity.TagId())
 			}
 		}
 
-		if ite.ChildIfdPath() == exifcommon.IfdPathStandardGps {
+		if ite.ChildIfdPath() == exifcommon.IfdGpsInfoStandardIfdIdentity.UnindexedString() {
 			foundGps++
 
-			if ite.TagId() != exifcommon.IfdGpsId {
-				t.Fatalf("GPS IFD tag-ID mismatch: (0x%04x) != (0x%04x)", ite.TagId(), exifcommon.IfdGpsId)
+			if ite.TagId() != exifcommon.IfdGpsInfoStandardIfdIdentity.TagId() {
+				t.Fatalf("GPS IFD tag-ID mismatch: (0x%04x) != (0x%04x)", ite.TagId(), exifcommon.IfdGpsInfoStandardIfdIdentity.TagId())
 			}
 		}
 	}
@@ -367,12 +366,12 @@ func TestCollect(t *testing.T) {
 	}
 
 	foundIop := 0
-	for _, ite := range lookup[exifcommon.IfdPathStandardExif].Entries {
-		if ite.ChildIfdPath() == exifcommon.IfdPathStandardExifIop {
+	for _, ite := range lookup[exifcommon.IfdExifStandardIfdIdentity.UnindexedString()].Entries {
+		if ite.ChildIfdPath() == exifcommon.IfdExifIopStandardIfdIdentity.UnindexedString() {
 			foundIop++
 
-			if ite.TagId() != exifcommon.IfdIopId {
-				t.Fatalf("IOP IFD tag-ID mismatch: (0x%04x) != (0x%04x)", ite.TagId(), exifcommon.IfdIopId)
+			if ite.TagId() != exifcommon.IfdExifIopStandardIfdIdentity.TagId() {
+				t.Fatalf("IOP IFD tag-ID mismatch: (0x%04x) != (0x%04x)", ite.TagId(), exifcommon.IfdExifIopStandardIfdIdentity.TagId())
 			}
 		}
 	}

@@ -111,7 +111,9 @@ func (it *IndexedTag) Is(ifdPath string, id uint16) bool {
 	return it.Id == id && it.IfdPath == ifdPath
 }
 
-func (it *IndexedTag) WidestSupportedType() exifcommon.TagTypePrimitive {
+// WidestSupportedType returns the largest type that this tag's value can
+// occupy
+func (it *IndexedTag) GetEncodingType(value interface{}) exifcommon.TagTypePrimitive {
 	if len(it.SupportedTypes) == 0 {
 		log.Panicf("IndexedTag [%s] (%d) has no supported types.", it.IfdPath, it.Id)
 	} else if len(it.SupportedTypes) == 1 {
@@ -120,19 +122,34 @@ func (it *IndexedTag) WidestSupportedType() exifcommon.TagTypePrimitive {
 
 	supportsLong := false
 	supportsShort := false
+	supportsRational := false
+	supportsSignedRational := false
 	for _, supportedType := range it.SupportedTypes {
 		if supportedType == exifcommon.TypeLong {
 			supportsLong = true
 		} else if supportedType == exifcommon.TypeShort {
 			supportsShort = true
+		} else if supportedType == exifcommon.TypeRational {
+			supportsRational = true
+		} else if supportedType == exifcommon.TypeSignedRational {
+			supportsSignedRational = true
 		}
 	}
 
-	// If it supports both long and short ints. This is currently our common
-	// and only case. The moment more are added to our tags database, we'll have
-	// to add more checks here if we add more than just a LONG and just a SHORT.
+	// We specifically check for the cases that we know to expect.
+
 	if supportsLong == true && supportsShort == true {
 		return exifcommon.TypeLong
+	} else if supportsRational == true && supportsSignedRational == true {
+		if value == nil {
+			log.Panicf("GetEncodingType: require value to be given")
+		}
+
+		if _, ok := value.(exifcommon.SignedRational); ok == true {
+			return exifcommon.TypeSignedRational
+		} else {
+			return exifcommon.TypeRational
+		}
 	}
 
 	log.Panicf("WidestSupportedType() case is not handled for tag [%s] (0x%04x): %v", it.IfdPath, it.Id, it.SupportedTypes)
@@ -208,7 +225,7 @@ func (ti *TagIndex) Add(it *IndexedTag) (err error) {
 
 // Get returns information about the non-IFD tag given a tag ID. `ifdPath` must
 // not be fully-qualified.
-func (ti *TagIndex) Get(ifdPath string, id uint16) (it *IndexedTag, err error) {
+func (ti *TagIndex) Get(ii *exifcommon.IfdIdentity, id uint16) (it *IndexedTag, err error) {
 	defer func() {
 		if state := recover(); state != nil {
 			err = log.Wrap(state.(error))
@@ -219,6 +236,8 @@ func (ti *TagIndex) Get(ifdPath string, id uint16) (it *IndexedTag, err error) {
 		err := LoadStandardTags(ti)
 		log.PanicIf(err)
 	}
+
+	ifdPath := ii.UnindexedString()
 
 	family, found := ti.tagsByIfd[ifdPath]
 	if found == false {
@@ -233,8 +252,55 @@ func (ti *TagIndex) Get(ifdPath string, id uint16) (it *IndexedTag, err error) {
 	return it, nil
 }
 
+var (
+	// tagGuessDefaultIfdIdentities describes which IFDs we'll look for a given
+	// tag-ID in, if it's not found where it's supposed to be. We suppose that
+	// Exif-IFD tags might be found in IFD0 or IFD1, or IFD0/IFD1 tags might be
+	// found in the Exif IFD. This is the only thing we've seen so far. So, this
+	// is the limit of our guessing.
+	tagGuessDefaultIfdIdentities = []*exifcommon.IfdIdentity{
+		exifcommon.IfdExifStandardIfdIdentity,
+		exifcommon.IfdStandardIfdIdentity,
+	}
+)
+
+// FindFirst looks for the given tag-ID in each of the given IFDs in the given
+// order. If `fqIfdPaths` is `nil` then use a default search order. This defies
+// the standard, which requires each tag to exist in certain IFDs. This is a
+// contingency to make recommendations for malformed data.
+//
+// Things *can* end badly here, in that the same tag-ID in different IFDs might
+// describe different data and different ata-types, and our decode might then
+// produce binary and non-printable data.
+func (ti *TagIndex) FindFirst(id uint16, ifdIdentities []*exifcommon.IfdIdentity) (it *IndexedTag, err error) {
+	defer func() {
+		if state := recover(); state != nil {
+			err = log.Wrap(state.(error))
+		}
+	}()
+
+	if ifdIdentities == nil {
+		ifdIdentities = tagGuessDefaultIfdIdentities
+	}
+
+	for _, ii := range ifdIdentities {
+		it, err := ti.Get(ii, id)
+		if err != nil {
+			if err == ErrTagNotFound {
+				continue
+			}
+
+			log.Panic(err)
+		}
+
+		return it, nil
+	}
+
+	return nil, ErrTagNotFound
+}
+
 // GetWithName returns information about the non-IFD tag given a tag name.
-func (ti *TagIndex) GetWithName(ifdPath string, name string) (it *IndexedTag, err error) {
+func (ti *TagIndex) GetWithName(ii *exifcommon.IfdIdentity, name string) (it *IndexedTag, err error) {
 	defer func() {
 		if state := recover(); state != nil {
 			err = log.Wrap(state.(error))
@@ -245,6 +311,8 @@ func (ti *TagIndex) GetWithName(ifdPath string, name string) (it *IndexedTag, er
 		err := LoadStandardTags(ti)
 		log.PanicIf(err)
 	}
+
+	ifdPath := ii.UnindexedString()
 
 	it, found := ti.tagsByIfdR[ifdPath][name]
 	if found != true {

@@ -38,8 +38,7 @@ type IfdTagEntry struct {
 
 	// TODO(dustin): !! IB's host the child-IBs directly in the tag, but that's not the case here. Refactor to accomodate it for a consistent experience.
 
-	// fqIfdPath is the IFD that this tag belongs to.
-	fqIfdPath string
+	ifdIdentity *exifcommon.IfdIdentity
 
 	isUnhandledUnknown bool
 
@@ -47,9 +46,9 @@ type IfdTagEntry struct {
 	byteOrder       binary.ByteOrder
 }
 
-func newIfdTagEntry(fqIfdPath string, tagId uint16, tagIndex int, tagType exifcommon.TagTypePrimitive, unitCount uint32, valueOffset uint32, rawValueOffset []byte, addressableData []byte, byteOrder binary.ByteOrder) *IfdTagEntry {
+func newIfdTagEntry(ii *exifcommon.IfdIdentity, tagId uint16, tagIndex int, tagType exifcommon.TagTypePrimitive, unitCount uint32, valueOffset uint32, rawValueOffset []byte, addressableData []byte, byteOrder binary.ByteOrder) *IfdTagEntry {
 	return &IfdTagEntry{
-		fqIfdPath:       fqIfdPath,
+		ifdIdentity:     ii,
 		tagId:           tagId,
 		tagIndex:        tagIndex,
 		tagType:         tagType,
@@ -63,12 +62,12 @@ func newIfdTagEntry(fqIfdPath string, tagId uint16, tagIndex int, tagType exifco
 
 // String returns a stringified representation of the struct.
 func (ite *IfdTagEntry) String() string {
-	return fmt.Sprintf("IfdTagEntry<TAG-IFD-PATH=[%s] TAG-ID=(0x%04x) TAG-TYPE=[%s] UNIT-COUNT=(%d)>", ite.fqIfdPath, ite.tagId, ite.tagType.String(), ite.unitCount)
+	return fmt.Sprintf("IfdTagEntry<TAG-IFD-PATH=[%s] TAG-ID=(0x%04x) TAG-TYPE=[%s] UNIT-COUNT=(%d)>", ite.ifdIdentity.String(), ite.tagId, ite.tagType.String(), ite.unitCount)
 }
 
 // IfdPath returns the fully-qualified path of the IFD that owns this tag.
 func (ite *IfdTagEntry) IfdPath() string {
-	return ite.fqIfdPath
+	return ite.ifdIdentity.String()
 }
 
 // TagId returns the ID of the tag that we represent. The combination of
@@ -80,13 +79,13 @@ func (ite *IfdTagEntry) TagId() uint16 {
 // IsThumbnailOffset returns true if the tag has the IFD and tag-ID of a
 // thumbnail offset.
 func (ite *IfdTagEntry) IsThumbnailOffset() bool {
-	return ite.tagId == ThumbnailOffsetTagId && ite.fqIfdPath == ThumbnailFqIfdPath
+	return ite.tagId == ThumbnailOffsetTagId && ite.ifdIdentity.String() == ThumbnailFqIfdPath
 }
 
 // IsThumbnailSize returns true if the tag has the IFD and tag-ID of a thumbnail
 // size.
 func (ite *IfdTagEntry) IsThumbnailSize() bool {
-	return ite.tagId == ThumbnailSizeTagId && ite.fqIfdPath == ThumbnailFqIfdPath
+	return ite.tagId == ThumbnailSizeTagId && ite.ifdIdentity.String() == ThumbnailFqIfdPath
 }
 
 // TagType is the type of value for this tag.
@@ -234,10 +233,10 @@ func (ite *IfdTagEntry) setIsUnhandledUnknown(isUnhandledUnknown bool) {
 }
 
 // SetChildIfd sets child-IFD information (if we represent a child IFD).
-func (ite *IfdTagEntry) SetChildIfd(childFqIfdPath, childIfdPath, childIfdName string) {
-	ite.childFqIfdPath = childFqIfdPath
-	ite.childIfdPath = childIfdPath
-	ite.childIfdName = childIfdName
+func (ite *IfdTagEntry) SetChildIfd(ii *exifcommon.IfdIdentity) {
+	ite.childFqIfdPath = ii.String()
+	ite.childIfdPath = ii.UnindexedString()
+	ite.childIfdName = ii.Name()
 }
 
 // ChildIfdName returns the name of the child IFD
@@ -259,7 +258,7 @@ func (ite *IfdTagEntry) ChildFqIfdPath() string {
 
 func (ite *IfdTagEntry) getValueContext() *exifcommon.ValueContext {
 	return exifcommon.NewValueContext(
-		ite.fqIfdPath,
+		ite.ifdIdentity.String(),
 		ite.tagId,
 		ite.unitCount,
 		ite.valueOffset,

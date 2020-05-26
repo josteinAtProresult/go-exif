@@ -119,7 +119,7 @@ func (et ExifTag) String() string {
     return fmt.Sprintf("ExifTag<IFD-PATH=[%s] TAG-ID=(0x%02x) TAG-NAME=[%s] TAG-TYPE=[%s] VALUE=[%v] VALUE-BYTES=(%d) CHILD-IFD-PATH=[%s]", et.IfdPath, et.TagId, et.TagName, et.TagTypeName, et.FormattedFirst, len(et.ValueBytes), et.ChildIfdPath)
 }
 
-// TODO(dustin): In the next release, make this return a list of skipped tags, too.
+// RELEASE(dustin): In the next release, make this return a list of skipped tags, too.
 
 // GetFlatExifData returns a simple, flat representation of all tags.
 func GetFlatExifData(exifData []byte) (exifTags []ExifTag, err error) {
@@ -141,12 +141,9 @@ func GetFlatExifData(exifData []byte) (exifTags []ExifTag, err error) {
 
     visitor := func(fqIfdPath string, ifdIndex int, ite *IfdTagEntry) (err error) {
         tagId := ite.TagId()
+        ii := ite.ifdIdentity
 
-        // TODO(dustin): This is inefficient. Our IFD paths should have their own type where we can render whatever path we need.
-        ifdPath, err := im.StripPathPhraseIndices(fqIfdPath)
-        log.PanicIf(err)
-
-        it, err := ti.Get(ifdPath, ite.tagId)
+        it, err := ti.Get(ii, ite.tagId)
         if err != nil {
             if log.Is(err, ErrTagNotFound) != true {
                 log.Panic(err)
@@ -161,6 +158,11 @@ func GetFlatExifData(exifData []byte) (exifTags []ExifTag, err error) {
             // can use more advanced functionality to specifically -handle
             // unknown tags.
             utilityLogger.Warningf(nil, "Tag with ID (0x%04x) in IFD [%s] is not recognized and will be ignored.", tagId, fqIfdPath)
+
+            it, err := ti.FindFirst(ite.tagId, nil)
+            if err == nil {
+                utilityLogger.Warningf(nil, "(cont'd) Tag [%s] with the same ID has been found in IFD [%s] and may be related. The tag you were looking for might have been written to the wrong IFD by a buggy implementation.", it.Name, it.IfdPath)
+            }
 
             return nil
         }
@@ -212,7 +214,7 @@ func GetFlatExifData(exifData []byte) (exifTags []ExifTag, err error) {
         return nil
     }
 
-    err = ie.Scan(exifcommon.IfdStandard, eh.FirstIfdOffset, visitor)
+    err = ie.Scan(exifcommon.IfdStandardIfdIdentity, eh.FirstIfdOffset, visitor)
     log.PanicIf(err)
 
     return exifTags, nil
@@ -236,20 +238,4 @@ func GpsDegreesEquals(gi1, gi2 GpsDegrees) bool {
     }
 
     return true
-}
-
-// FqIfdPath returns a fully-qualified IFD path expression.
-func FqIfdPath(parentFqIfdName, ifdName string, ifdIndex int) string {
-    var currentIfd string
-    if parentFqIfdName != "" {
-        currentIfd = fmt.Sprintf("%s/%s", parentFqIfdName, ifdName)
-    } else {
-        currentIfd = ifdName
-    }
-
-    if ifdIndex > 0 {
-        currentIfd = fmt.Sprintf("%s%d", currentIfd, ifdIndex)
-    }
-
-    return currentIfd
 }
