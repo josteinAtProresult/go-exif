@@ -1082,12 +1082,13 @@ func (ib *IfdBuilder) AddTagsFromExisting(ifd *Ifd, includeTagIds []uint16, excl
 			if rawBytes != nil {
 				value := NewIfdBuilderTagValueFromBytes(rawBytes)
 
-			bt = NewBuilderTag(
-				ifd.ifdIdentity.UnindexedString(),
-				ite.TagId(),
-				ite.TagType(),
-				value,
-				ib.byteOrder)
+				bt = NewBuilderTag(
+					ifd.ifdIdentity.UnindexedString(),
+					ite.TagId(),
+					ite.TagType(),
+					value,
+					ib.byteOrder)
+			}
 		}
 
 		if bt != nil {
