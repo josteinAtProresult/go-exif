@@ -33,6 +33,9 @@ var (
 
 	// ErrOffsetInvalid means that the file offset is not valid.
 	ErrOffsetInvalid = errors.New("file offset invalid")
+
+	// ErrExpectedRationalGotSRational means that a SRational was found where Rational was expected, and it could not be converted to Rational (has negative number)
+	ErrExpectedRationalGotSRational = errors.New("rational expected, got negative srational")
 )
 
 var (
@@ -962,6 +965,26 @@ func (ifd *Ifd) DumpTree() []string {
 	return ifd.dumpTree(nil, 0)
 }
 
+func toRationalSlice(tagvalue interface{}) []exifcommon.Rational {
+	latitudeRaw, isRational := tagvalue.([]exifcommon.Rational)
+	if !isRational { // Try if it is a positive signed rational, so that it can be converted to rational without problem
+		signedLatitudeRaw, isSignedRational := tagvalue.([]exifcommon.SignedRational)
+		if isSignedRational {
+			for _, sr := range signedLatitudeRaw {
+				if sr.Denominator >= 0 && sr.Numerator >= 0 {
+					latitudeRaw = append(latitudeRaw, exifcommon.Rational{Numerator: uint32(sr.Numerator), Denominator: uint32(sr.Denominator)})
+				} else {
+					log.Panic(ErrExpectedRationalGotSRational)
+				}
+			}
+		} else {
+			// Fallback to original behaviour, which will cause panic
+			latitudeRaw = tagvalue.([]exifcommon.Rational)
+		}
+	}
+	return latitudeRaw
+}
+
 // GpsInfo parses and consolidates the GPS info. This can only be called on the
 // GPS IFD.
 func (ifd *Ifd) GpsInfo() (gi *GpsInfo, err error) {
@@ -1039,12 +1062,12 @@ func (ifd *Ifd) GpsInfo() (gi *GpsInfo, err error) {
 
 	// Parse location.
 
-	latitudeRaw := latitudeValue.([]exifcommon.Rational)
+	latitudeRaw := toRationalSlice(latitudeValue)
 
 	gi.Latitude, err = NewGpsDegreesFromRationals(latitudeRefValue.(string), latitudeRaw)
 	log.PanicIf(err)
 
-	longitudeRaw := longitudeValue.([]exifcommon.Rational)
+	longitudeRaw := toRationalSlice(longitudeValue)
 
 	gi.Longitude, err = NewGpsDegreesFromRationals(longitudeRefValue.(string), longitudeRaw)
 	log.PanicIf(err)
