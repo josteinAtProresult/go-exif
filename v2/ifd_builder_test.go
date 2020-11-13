@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dsoprea/go-exif/v2/common"
 	"github.com/dsoprea/go-exif/v2/undefined"
@@ -1550,6 +1551,71 @@ func ExampleIfdBuilder_SetStandardWithName_updateGps() {
 	// Degrees<O=[N] D=(11) M=(22) S=(33)>
 }
 
+func ExampleIfdBuilder_SetStandardWithName_timestamp() {
+	// Check initial value.
+
+	filepath := getTestGpsImageFilepath()
+
+	rawExif, err := SearchFileAndExtractExif(filepath)
+	log.PanicIf(err)
+
+	im := NewIfdMapping()
+
+	err = LoadStandardIfds(im)
+	log.PanicIf(err)
+
+	ti := NewTagIndex()
+
+	_, index, err := Collect(im, ti, rawExif)
+	log.PanicIf(err)
+
+	rootIfd := index.RootIfd
+
+	// Update the value.
+
+	rootIb := NewIfdBuilderFromExistingChain(rootIfd)
+
+	exifIb, err := rootIb.ChildWithTagId(exifcommon.IfdExifStandardIfdIdentity.TagId())
+	log.PanicIf(err)
+
+	t := time.Date(2020, 06, 7, 1, 30, 0, 0, time.UTC)
+
+	err = exifIb.SetStandardWithName("DateTimeDigitized", t)
+	log.PanicIf(err)
+
+	// Encode to bytes.
+
+	ibe := NewIfdByteEncoder()
+
+	updatedRawExif, err := ibe.EncodeToExif(rootIb)
+	log.PanicIf(err)
+
+	// Decode from bytes.
+
+	_, updatedIndex, err := Collect(im, ti, updatedRawExif)
+	log.PanicIf(err)
+
+	updatedRootIfd := updatedIndex.RootIfd
+
+	// Test.
+
+	updatedExifIfd, err := updatedRootIfd.ChildWithIfdPath(exifcommon.IfdExifStandardIfdIdentity)
+	log.PanicIf(err)
+
+	results, err := updatedExifIfd.FindTagWithName("DateTimeDigitized")
+	log.PanicIf(err)
+
+	ite := results[0]
+
+	phrase, err := ite.FormatFirst()
+	log.PanicIf(err)
+
+	fmt.Printf("%s\n", phrase)
+
+	// Output:
+	// 2020:06:07 01:30:00
+}
+
 func TestIfdBuilder_NewIfdBuilderFromExistingChain_RealData(t *testing.T) {
 	testImageFilepath := getTestImageFilepath()
 
@@ -1866,10 +1932,11 @@ func ExampleIfd_Thumbnail() {
 	_, index, err := Collect(im, ti, rawExif)
 	log.PanicIf(err)
 
-	thumbnailData, err := index.RootIfd.NextIfd.Thumbnail()
+	// This returns the raw bytes that you will be looking for, but there's no
+	// use for them at this point in the example.
+	_, err = index.RootIfd.NextIfd.Thumbnail()
 	log.PanicIf(err)
 
-	thumbnailData = thumbnailData
 	// Output:
 }
 
@@ -1916,10 +1983,12 @@ func ExampleBuilderTag_SetValue() {
 	// Encode.
 
 	ibe := NewIfdByteEncoder()
-	updatedExif, err := ibe.EncodeToExif(rootIb)
+
+	// This returns the raw bytes that you will be looking for, but there's no
+	// use for them at this point in the example.
+	_, err = ibe.EncodeToExif(rootIb)
 	log.PanicIf(err)
 
-	updatedExif = updatedExif
 	// Output:
 }
 

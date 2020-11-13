@@ -35,6 +35,7 @@ var (
 	mainLogger = log.NewLogger("main.main")
 )
 
+// IfdEntry is a JSON model for representing a single tag.
 type IfdEntry struct {
 	IfdPath     string                      `json:"ifd_path"`
 	FqIfdPath   string                      `json:"fq_ifd_path"`
@@ -53,7 +54,7 @@ type parameters struct {
 	PrintAsJson             bool   `short:"j" long:"json" description:"Print out as JSON"`
 	IsVerbose               bool   `short:"v" long:"verbose" description:"Print logging"`
 	ThumbnailOutputFilepath string `short:"t" long:"thumbnail-output-filepath" description:"File-path to write thumbnail to (if present)"`
-	DoNotPrintTags          bool   `short:"n" long:"no-tags" description:"Do not actually print tags. Good for auditing the logs or merely checking the EXIF structure for errors"`
+	DoNotPrintTags          bool   `short:"n" long:"no-tags" description:"Do not actually print tags. Good for auditing the logs or merely checking the EXIF structure for errors."`
 }
 
 var (

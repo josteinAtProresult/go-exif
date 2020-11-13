@@ -173,7 +173,7 @@ func ParseExifHeader(data []byte) (eh ExifHeader, err error) {
 	//      CIPA DC-008-2016; JEITA CP-3451D
 	//      -> http://www.cipa.jp/std/documents/e/DC-008-Translation-2016-E.pdf
 
-	if len(data) < 8 {
+	if len(data) < ExifSignatureLength {
 		exifLogger.Warningf(nil, "Not enough data for EXIF header: (%d)", len(data))
 		return eh, ErrNoExif
 	}
@@ -192,7 +192,7 @@ func ParseExifHeader(data []byte) (eh ExifHeader, err error) {
 }
 
 // Visit recursively invokes a callback for every tag.
-func Visit(rootIfdIdentity *exifcommon.IfdIdentity, ifdMapping *IfdMapping, tagIndex *TagIndex, exifData []byte, visitor TagVisitorFn) (eh ExifHeader, furthestOffset uint32, err error) {
+func Visit(rootIfdIdentity *exifcommon.IfdIdentity, ifdMapping *exifcommon.IfdMapping, tagIndex *TagIndex, exifData []byte, visitor TagVisitorFn) (eh ExifHeader, furthestOffset uint32, err error) {
 	defer func() {
 		if state := recover(); state != nil {
 			err = log.Wrap(state.(error))
@@ -204,7 +204,7 @@ func Visit(rootIfdIdentity *exifcommon.IfdIdentity, ifdMapping *IfdMapping, tagI
 
 	ie := NewIfdEnumerate(ifdMapping, tagIndex, exifData, eh.ByteOrder)
 
-	err = ie.Scan(rootIfdIdentity, eh.FirstIfdOffset, visitor)
+	_, err = ie.Scan(rootIfdIdentity, eh.FirstIfdOffset, visitor)
 	log.PanicIf(err)
 
 	furthestOffset = ie.FurthestOffset()
@@ -213,7 +213,7 @@ func Visit(rootIfdIdentity *exifcommon.IfdIdentity, ifdMapping *IfdMapping, tagI
 }
 
 // Collect recursively builds a static structure of all IFDs and tags.
-func Collect(ifdMapping *IfdMapping, tagIndex *TagIndex, exifData []byte) (eh ExifHeader, index IfdIndex, err error) {
+func Collect(ifdMapping *exifcommon.IfdMapping, tagIndex *TagIndex, exifData []byte) (eh ExifHeader, index IfdIndex, err error) {
 	defer func() {
 		if state := recover(); state != nil {
 			err = log.Wrap(state.(error))

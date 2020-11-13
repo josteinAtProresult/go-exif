@@ -3,6 +3,7 @@ package exif
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/dsoprea/go-logging"
 
@@ -181,6 +182,20 @@ func TestIndexedTag_GetEncodingType_BothRationalTypes(t *testing.T) {
 	}
 }
 
+func TestIndexedTag_GetEncodingType_Timestamp(t *testing.T) {
+	it := &IndexedTag{
+		SupportedTypes: []exifcommon.TagTypePrimitive{
+			exifcommon.TypeAscii,
+		},
+	}
+
+	zeroTime := time.Time{}
+
+	if it.GetEncodingType(zeroTime) != exifcommon.TypeAscii {
+		t.Fatalf("Expected the timestamp to to be encoded as ASCII.")
+	}
+}
+
 func TestIndexedTag_DoesSupportType(t *testing.T) {
 	it := &IndexedTag{
 		Id:      0xb,
@@ -272,7 +287,7 @@ func TestTagIndex_FindFirst_HitOnFirst(t *testing.T) {
 	ti := NewTagIndex()
 
 	// ExifVersion
-	it, err := ti.FindFirst(0x9000, searchOrder)
+	it, err := ti.FindFirst(0x9000, exifcommon.TypeUndefined, searchOrder)
 	log.PanicIf(err)
 
 	if it.Is("IFD/Exif", 0x9000) != true {
@@ -290,7 +305,7 @@ func TestTagIndex_FindFirst_HitOnSecond(t *testing.T) {
 	ti := NewTagIndex()
 
 	// ProcessingSoftware
-	it, err := ti.FindFirst(0x000b, searchOrder)
+	it, err := ti.FindFirst(0x000b, exifcommon.TypeAscii, searchOrder)
 	log.PanicIf(err)
 
 	if it.Is("IFD", 0x000b) != true {
@@ -307,7 +322,7 @@ func TestTagIndex_FindFirst_DefaultOrder_Miss(t *testing.T) {
 
 	ti := NewTagIndex()
 
-	_, err := ti.FindFirst(0x1234, searchOrder)
+	_, err := ti.FindFirst(0x1234, exifcommon.TypeRational, searchOrder)
 	if err == nil {
 		t.Fatalf("Expected error for invalid tag.")
 	} else if err != ErrTagNotFound {
@@ -325,7 +340,7 @@ func TestTagIndex_FindFirst_ReverseDefaultOrder_HitOnSecond(t *testing.T) {
 	ti := NewTagIndex()
 
 	// ExifVersion
-	it, err := ti.FindFirst(0x9000, reverseSearchOrder)
+	it, err := ti.FindFirst(0x9000, exifcommon.TypeUndefined, reverseSearchOrder)
 	log.PanicIf(err)
 
 	if it.Is("IFD/Exif", 0x9000) != true {
@@ -343,7 +358,7 @@ func TestTagIndex_FindFirst_ReverseDefaultOrder_HitOnFirst(t *testing.T) {
 	ti := NewTagIndex()
 
 	// ProcessingSoftware
-	it, err := ti.FindFirst(0x000b, reverseSearchOrder)
+	it, err := ti.FindFirst(0x000b, exifcommon.TypeAscii, reverseSearchOrder)
 	log.PanicIf(err)
 
 	if it.Is("IFD", 0x000b) != true {
@@ -360,7 +375,7 @@ func TestTagIndex_FindFirst_ReverseDefaultOrder_Miss(t *testing.T) {
 
 	ti := NewTagIndex()
 
-	_, err := ti.FindFirst(0x1234, reverseSearchOrder)
+	_, err := ti.FindFirst(0x1234, exifcommon.TypeRational, reverseSearchOrder)
 	if err == nil {
 		t.Fatalf("Expected error for invalid tag.")
 	} else if err != ErrTagNotFound {

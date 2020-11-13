@@ -2,17 +2,23 @@ language: go
 go:
   - master
   - stable
+  - "1.14"
   - "1.13"
   - "1.12"
-  - "1.11"
-  - "1.10"
+env:
+  - GO111MODULE=on
 install:
   - go get -t ./...
-  - go get github.com/mattn/goveralls
 script:
-# Don't test recursively, so we stay within v1/legacy.
-  - go test -v github.com/dsoprea/go-exif
-  - go test -v github.com/dsoprea/go-exif/exif-read-tool
-# Coverage is based on v2.
+# v1
+  - go test -v .
+  - go test -v ./exif-read-tool
+# v2
   - cd v2
-  - EXIF_MODULE_ROOT_PATH="$(pwd)" goveralls -v -service=travis-ci
+  - go test -v ./...
+  - cd ..
+# v3. Coverage reports comes from this.
+  - cd v3
+  - go test -v ./... -coverprofile=coverage.txt -covermode=atomic
+after_success:
+  - curl -s https://codecov.io/bash | bash
