@@ -1077,6 +1077,9 @@ func (ib *IfdBuilder) AddTagsFromExisting(ifd *Ifd, includeTagIds []uint16, excl
 			// Non-IFD tag.
 
 			rawBytes, err := ite.GetRawBytes()
+			if errors.Is(err, exifundefined.ErrUnparseableValue) { // Ignore unparseable values, so that we can copy the valid exifs
+				err = nil
+			}
 			log.PanicIf(err)
 
 			if rawBytes != nil {
