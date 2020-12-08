@@ -1003,6 +1003,8 @@ func (ib *IfdBuilder) AddTagsFromExisting(ifd *Ifd, includeTagIds []uint16, excl
 		log.PanicIf(err)
 	} else if log.Is(err, ErrNoThumbnail) == false {
 		log.Panic(err)
+	} else {
+		err = nil
 	}
 
 	for i, ite := range ifd.Entries {
